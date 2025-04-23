@@ -1,9 +1,9 @@
 import yfinance as yf
-import numpy as np
 import pandas as pd
+import numpy as np
+import datetime
 
 #ML libraries
-from sklearn.preprocessing import MinMaxScaler
 from sklearn.model_selection import train_test_split
 from sklearn.ensemble import RandomForestRegressor
 
@@ -16,7 +16,7 @@ class Asset():
         self.asset_class = asset_class
         self.quantity = quantity
         self.purchase_price = price
-        self.value = self.GetPrice() #Only used for prediction purposes
+        self.value = 0 #Only used for prediction purposes
 
     def GetPrice(self):
         """
@@ -161,7 +161,7 @@ class Model():
                 total_value += asset.quantity * asset.GetPrice()
         return total_value
 
-    def PrepData(self, data, look_back):
+    def TransformData(self, data, look_back):
         """
         Creates rows with historical data included to train the 
         RF model on. Assumes that the closing price of the next 
@@ -192,69 +192,85 @@ class Model():
         Splits the provided data into y (we want to predict)
         and X (feature matrix). Useful for training.
         """
-        y = data['Close_0'] # We want to predict the closing of the next day
-        X = data.drop(columns=['Close_0']) # We have every information except these points
+        y = data['Close_0'] # We want to predict the closing of the next day)
+        X = data.drop(columns=['Close_0']) # We have every information except these points )
         return X, y
 
-    #Create a ML model
-    def SimulatePortfolio(self, num_simulations=100000, forecast_years=15, look_back=60):
-
-        num_timesteps = forecast_years * 252
-        portfolio_futures = []
-        initial_assets = self.assets
-        models = {}
-
-        model = RandomForestRegressor() # Input data is quite limited, random forest often sufficient
+    def TrainModels(self, look_back=60):
+        """
+        Seperate function to train ML model.
+        """
         initial_assets = [Asset('AAPL', 'Technology', 'Equity', 3, 29), Asset('MSFT', 'Technology', 'Equity', 3, 29)]
         # Train a simple RF model for each asset
         print("Training models.")
+        models = {}
+
         for asset in initial_assets:
-            data = self.GetHistoricalData(asset.name , '5y')['Close'] # First we solely look at the closing prices
-            data = self.PrepData(data, look_back)
+            model = RandomForestRegressor() # Input data is quite limited, random forest often sufficient
+            data = self.GetHistoricalData(asset.name , '5y')['Close']
+            data = self.TransformData(data, look_back)
             X, y = self.SplitData(data)
             
             if X is not None:
                 X_train, _, y_train, _ = train_test_split(X, y, test_size=0.2, random_state=42)
                 model.fit(X_train, y_train)
                 models[asset.name] = model
+
             else:
                 print(f"Could not prepare data for {asset.name}")
-        print("Calculating simulation...")
+
+        return models
+
+    #Create a ML model
+    def SimulatePortfolio(self, num_simulations=10, forecast_years=15, look_back=30):
+
+        num_timesteps = forecast_years * 252
+        portfolio_futures = []
+        assets = [Asset('AAPL', 'Technology', 'Equity', 3, 29), Asset('MSFT', 'Technology', 'Equity', 3, 29)]
+        models = self.TrainModels(look_back)
+        print("Calculating simulations...")
+        
+        start = datetime.datetime.now()
+
+        col_names = [f"Close_{day}" for day in range(1, look_back)]
+
         for sim in range(num_simulations):
-            portfolio_values = [sum(asset.quantity * asset.value for asset in initial_assets)]
-            current_assets = [Asset(a.name, a.sector, a.asset_class, a.quantity, a.purchase_price) for a in initial_assets]
-            #Copy by value so they don't get overwritten
-            
-            asset_sequences = dict()
-            for asset in current_assets:
-                last_sequence = yf.download(asset.name, period='1y', progress=False)['Close'].tail(look_back)
-                asset_sequences[asset.name] = last_sequence
+            print("Simulation:", sim)
+            portfolio_values = [sum(asset.quantity * asset.value for asset in assets)]
+            #^ Copy by value so they don't get overwritten
+        
+            asset_sequences = dict() # A dictionary which keeps track of all sequences per asset
+            for asset in assets:
+                data = self.GetHistoricalData(asset.name, '2y')['Close']
+                last_sequence = self.TransformData(data, look_back)
+                X, _ = self.SplitData(last_sequence)
+                asset_sequences[asset.name] = X[0:1]
+                asset_sequences[asset.name].columns = col_names
 
+            ts_start = datetime.datetime.now()
             for t in range(num_timesteps):
-                new_assets = []
-                for asset in current_assets:
+                values = []
+                for asset in assets:
                     if asset.name in models:
-                        last_sequence = self.PrepData(asset_sequences[asset.name], look_back) # Prepare data so the model can predict
-                        breakpoint()
-                        X, y = self.SplitData(last_sequence)
-                        predicted_price = models[asset.name].predict(X) # Predicted closing price for the next day by the model
-                        new_asset = Asset(asset.name, asset.sector, asset.asset_class, asset.quantity, predicted_price) # Create new asset to add
-                        new_asset.SetValue(predicted_price) # Make sure the value of the asset is adjusted to the predicted price
-                        new_assets.append(new_asset) # Add to the list
-                        asset_sequences[asset.name] = pd.concat([predicted_price,asset_sequences[asset.name].loc[:]]).reset_index(drop=True) # Update the data with predicted data
-                        breakpoint()
-                    else:
-                        # Simple forward carry if model doesn't work
-                        new_assets.append(asset) # Keep the old price if current not available
+                        predicted_price = models[asset.name].predict(asset_sequences[asset.name]) # Predicted closing price for the next day by the model
+                        random_shock = np.random.normal(0, 1)
+                        predicted_price += random_shock
 
-                current_portfolio_value = sum(a.quantity * a.value for a in new_assets if a.value is not None)
+                        data = dict(P=predicted_price)
+                        new_item = pd.DataFrame(data, index=[0])
+
+                        values.append(asset.quantity * predicted_price) # Create new asset to add
+                        sequence = pd.concat([new_item, asset_sequences[asset.name]], ignore_index=True, axis=1).iloc[:, :-1]
+                        sequence.columns = col_names
+                        asset_sequences[asset.name] = sequence
+
+                current_portfolio_value = sum(values)
                 portfolio_values.append(current_portfolio_value)
-                current_assets = new_assets
-            print(sim)
-            if sim%500 == 0:
-                print(portfolio_values)
-
+            print(f"Simulation {sim} time {datetime.datetime.now() - ts_start}")
             portfolio_futures.append(portfolio_values)
+
+        t_time = datetime.datetime.now() - start
+        print(f"Elapsed time: ", {t_time})
 
         return portfolio_futures
 

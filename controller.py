@@ -160,7 +160,7 @@ class Controller():
         option = ''
         while option == '':
             option = input("Please enter your choice (A/B/C):\n")
-            match option:
+            match option.capitalize():
                 case 'A':
                     calculations = self.Model.GetCalculations('total')
                     total_value = self.Model.GetPortfolioValue(option='total')
@@ -179,6 +179,8 @@ class Controller():
                     calculations = self.Model.GetCalculations('sector', sector=sector)
                     total_value = self.Model.GetPortfolioValue(option='sector', label=sector)
                     print(f"Your portfolio over sector {sector} is worth {round(total_value,3)} and is constructed as follows:")
+                case _:
+                    option = ''
         for item in calculations:
             print(item)
 
@@ -187,7 +189,8 @@ class Controller():
         Performs a simulation with the current portfolio for upcoming 15 years
         Includes 100.000 simulations paths
         """
-        self.Model.SimulatePortfolio(100_000, 15, 60)
+        values = self.Model.SimulatePortfolio(100, 15, 60)
+
 
     
 if __name__ == '__main__':

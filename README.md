@@ -56,7 +56,7 @@ This Python code provides a framework for managing and simulating the performanc
 
     
 ## Limitations
-1.  If you wish to speed up the process of training models, change the following line (238)
+1.  If you wish to speed up the process of training models, change the following line in model.py (238)
     ```python
     data = self.GetHistoricalData(asset.name , '50y') # Change to, for example, 5y.
     ```

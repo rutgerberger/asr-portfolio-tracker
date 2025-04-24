@@ -52,4 +52,16 @@ This Python code provides a framework for managing and simulating the performanc
 - **Run the application:**
     ```bash
     python controller.py
-    ``` 
+    ```
+
+    
+## Limitations
+1.  If you wish to speed up the process of training models, change the following line (238)
+    ```python
+    data = self.GetHistoricalData(asset.name , '50y') # Change to, for example, 5y.
+    ```
+    This may decrease the model's accuracy, but significantly speed up the training process
+2.  If you wish to speed up the simulation process, the only thing you can do is to limit
+   - The number of simulations
+   - The prediction window
+     This comes with a price of giving less insight, of course

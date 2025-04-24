@@ -120,13 +120,13 @@ class Controller():
             tickers = {asset.name for asset in self.Model.GetAssets()}
         print(tickers)
         if tickers is not None:
-            plot = View() # Create view object
+            plot = View("Historical price data", "Date", "Price") # Create view object
             for ticker_str in tickers:
                 data = self.Model.GetHistoricalData(ticker_str)
                 price = self.Model.GetPrice(ticker_str)
                 plot.PlotCurrentPrice(data.index, price, ticker_str)
                 if len(tickers) > 1:
-                    plot.PlotHistoricalData(data.index, data, ticker_str)
+                    plot.PlotData(data.index, data['Close'], ticker_str)
                 else:
                     plot.PlotSingleHistory(data.index, data, ticker_str)
             plot.Show()
@@ -184,12 +184,21 @@ class Controller():
         for item in calculations:
             print(item)
 
+
     def PerformSimulation(self):
         """
         Performs a simulation with the current portfolio for upcoming 15 years
-        Includes 100.000 simulations paths
+        Should perform 100.000 simulations paths
+        However, due to time limitations only 10 performed (edit this manually)
         """
-        values = self.Model.SimulatePortfolio(100, 15, 60)
+        num_simulations = 10
+        paths = self.Model.SimulatePortfolio(num_simulations, 10, 60)
+        plot = View("Portfolio simulation using Random Forest Regressor (15y)", "Time", "Estimated value", legend=False)
+        for idx,path in enumerate(paths):
+            my_list = [float(i) for i in path[1:]]
+            plot.PlotData(range(len(path[1:])), my_list, f'Scenario {idx}')
+        plot.Show()
+
 
 
     

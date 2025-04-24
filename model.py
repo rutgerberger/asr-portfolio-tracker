@@ -9,6 +9,11 @@ from sklearn.ensemble import RandomForestRegressor
 
 
 class Asset():
+    """
+    An Asset object is used within calculations and keeps track
+    of the assigned features, such as the sector, class or 
+    quantity.
+    """
     def __init__(self, ticker: str, sector: str, asset_class: str, quantity: int, price: float):
         self.name = ticker
         self.ticker = yf.Ticker(ticker)
@@ -142,6 +147,7 @@ class Model():
             for asset in self.assets:
                 if asset.sector == sector:
                     all_assets.add(asset)
+            for asset in self.assets:
                 if asset.sector == sector:
                     asset_dict = {"ticker": asset.name, "weight": round(self.GetWeight(asset, all_assets),3), "value": asset.quantity * asset.GetPrice()}
                     calculations.append(asset_dict)
@@ -161,12 +167,30 @@ class Model():
                 total_value += asset.quantity * asset.GetPrice()
         return total_value
 
+    def GetAssetFeatures(self, data):
+        """
+        Returns dataframe with features we want to train RF
+        model on - daily change - percentual change - log
+        returns - closing price and volatility
+        """
+        df = pd.DataFrame()
+
+        df['DailyChange'] = data['Close'] - data['Open']
+        df['PctChange'] = data['Close'].pct_change()
+        df['LogReturns'] = np.log(data['Close'] / data['Close'].shift(1))
+        df['Close'] = data['Close']
+
+        # Calculate Volatility (using a rolling standard deviation of log returns))
+        window = 20
+        df['Volatility'] = df['LogReturns'].rolling(window=window).std() * np.sqrt(252)
+        return df.dropna() # No NaN values  
+
     def TransformData(self, data, look_back):
         """
         Creates rows with historical data included to train the 
         RF model on. Assumes that the closing price of the next 
         day is the one we want to predict and the closing of the
-        previous is everything we know.
+        previous days is everything we can know.
         """
         cols = []
         col_names = []
@@ -176,43 +200,48 @@ class Model():
         for day in range(look_back):
             item = data.iloc[day:].reset_index(drop=True).copy()
             cols.append(item)
-            col_names.append(f"Close_{day}")
+            for column in data.columns:
+                col_names.append(f"{column}_{day}")
 
         merged = pd.concat(cols,ignore_index=True,axis=1)
         merged = merged[:-look_back]
         merged.columns = col_names
         for col in merged.columns:
-            if "id_" in col:
+            if "id_" in col or "index_" in col:
                 merged.drop(columns=col, inplace=True)
 
-        return merged
+        return merged.dropna()
 
     def SplitData(self, data):
         """
         Splits the provided data into y (we want to predict)
-        and X (feature matrix). Useful for training.
+        and X (feature matrix). Useful for training purposes
         """
-        y = data['Close_0'] # We want to predict the closing of the next day)
-        X = data.drop(columns=['Close_0']) # We have every information except these points )
+        y = data['DailyChange_0'] # We want to predict the daily of the current day
+        X = data.drop(columns=['DailyChange_0', 'PctChange_0', 'LogReturns_0', 'Close_0', 'Volatility_0']) # We have every information the current day
         return X, y
 
     def TrainModels(self, look_back=60):
         """
-        Seperate function to train ML model.
+        Seperate function to train random forest models
+        Used within the simulation.
+        Trains a seperate model for each
+        asset within the portfolio
         """
-        initial_assets = [Asset('AAPL', 'Technology', 'Equity', 3, 29), Asset('MSFT', 'Technology', 'Equity', 3, 29)]
+        assets = self.assets
         # Train a simple RF model for each asset
         print("Training models.")
         models = {}
 
-        for asset in initial_assets:
+        for asset in assets:
             model = RandomForestRegressor() # Input data is quite limited, random forest often sufficient
-            data = self.GetHistoricalData(asset.name , '5y')['Close']
+            data = self.GetHistoricalData(asset.name , '50y')
+            data = self.GetAssetFeatures(data)
             data = self.TransformData(data, look_back)
             X, y = self.SplitData(data)
             
             if X is not None:
-                X_train, _, y_train, _ = train_test_split(X, y, test_size=0.2, random_state=42)
+                X_train, _, y_train, _ = train_test_split(X, y, test_size=0.2)
                 model.fit(X_train, y_train)
                 models[asset.name] = model
 
@@ -221,18 +250,20 @@ class Model():
 
         return models
 
-    #Create a ML model
     def SimulatePortfolio(self, num_simulations=10, forecast_years=15, look_back=30):
-
-        num_timesteps = forecast_years * 252
+        """
+        This function first trains a rf regressor based on historical price data
+        It then simulates step by step behaviour of the index
+        This way, a simulation takes +- 2 min -> therefore less than 
+        100_000 simulations are suggested.
+        """
+        num_timesteps = forecast_years * 252 # Number of trading days each year
         portfolio_futures = []
-        assets = [Asset('AAPL', 'Technology', 'Equity', 3, 29), Asset('MSFT', 'Technology', 'Equity', 3, 29)]
+        assets = self.assets
         models = self.TrainModels(look_back)
         print("Calculating simulations...")
         
         start = datetime.datetime.now()
-
-        col_names = [f"Close_{day}" for day in range(1, look_back)]
 
         for sim in range(num_simulations):
             print("Simulation:", sim)
@@ -240,29 +271,40 @@ class Model():
             #^ Copy by value so they don't get overwritten
         
             asset_sequences = dict() # A dictionary which keeps track of all sequences per asset
+            calc_sequences = dict()
             for asset in assets:
-                data = self.GetHistoricalData(asset.name, '2y')['Close']
-                last_sequence = self.TransformData(data, look_back)
-                X, _ = self.SplitData(last_sequence)
-                asset_sequences[asset.name] = X[0:1]
-                asset_sequences[asset.name].columns = col_names
-
+                data = self.GetHistoricalData(asset.name, '2y')
+                #We use calc_sequences to create the feature data with
+                #Features such as the volatility requires a look-back window
+                calc_sequences[asset.name] = data[['Open', 'Close']].reset_index()
+                #And this is for the true prediction purposes
+                data = self.GetAssetFeatures(calc_sequences[asset.name])
+                asset_sequences[asset.name] = data.reset_index(drop=True)
             ts_start = datetime.datetime.now()
             for t in range(num_timesteps):
                 values = []
                 for asset in assets:
                     if asset.name in models:
-                        predicted_price = models[asset.name].predict(asset_sequences[asset.name]) # Predicted closing price for the next day by the model
-                        random_shock = np.random.normal(0, 1)
-                        predicted_price += random_shock
+                        last_sequence = asset_sequences[asset.name].iloc[-(look_back+1):].copy()
+                        X = self.TransformData(pd.DataFrame(last_sequence), look_back)
+                        X = X.iloc[[-1]] #get the last row
+                        X, _ = self.SplitData(X)
+                        predicted_change = models[asset.name].predict(X) # Predicted closing price for the next day by the model
+                        randomness = np.random.normal(0, min(abs(asset_sequences[asset.name]['DailyChange'].iloc[-1]*2), 6)) # Add random element (rf is deterministic otherwise)
 
-                        data = dict(P=predicted_price)
-                        new_item = pd.DataFrame(data, index=[0])
+                        predicted_change += randomness
+                        new_price = asset_sequences[asset.name]['Close'].iloc[-1] + predicted_change #Predicted price for the next day
 
-                        values.append(asset.quantity * predicted_price) # Create new asset to add
-                        sequence = pd.concat([new_item, asset_sequences[asset.name]], ignore_index=True, axis=1).iloc[:, :-1]
-                        sequence.columns = col_names
-                        asset_sequences[asset.name] = sequence
+
+                        if new_price <= 0:
+                            new_price = 0.000001 #Non-zero prices.
+                        values.append(asset.quantity * new_price)
+
+                        new_row = pd.DataFrame({"Open": asset_sequences[asset.name]['Close'].iloc[[-1]], "Close": new_price}) # Wrong assumptionn
+                        calc_sequences[asset.name] = pd.concat([calc_sequences[asset.name], new_row], ignore_index=True).iloc[-(look_back*2):]
+                        asset_sequences[asset.name] = self.GetAssetFeatures(calc_sequences[asset.name])
+                        #sequence.columns = col_names
+                        #asset_sequences[asset.name] = sequence
 
                 current_portfolio_value = sum(values)
                 portfolio_values.append(current_portfolio_value)

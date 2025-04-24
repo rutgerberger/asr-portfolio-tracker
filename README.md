@@ -3,8 +3,10 @@
 
 This Python code provides a framework for managing and simulating the performance of a financial portfolio. It uses the `yfinance` library to fetch historical stock data and scikit-learn's `RandomForestRegressor` for predicting future asset prices. The core components include:
 
--   **`Asset` Class:** Represents a financial asset (e.g., stock) with attributes like ticker symbol, sector, asset class, quantity, and purchase price.
+-   **`Controller` Class:** This object handles the user input and calls the desired actions by creating an instance of the model class.
 -   **`Model` Class:** Manages a collection of assets, fetches historical data, trains machine learning models, and simulates portfolio performance.
+-   **`Asset` Class:** Represents a financial asset (e.g., stock) with attributes like ticker symbol, sector, asset class, quantity, and purchase price.
+-   **`View` Class:** Handles the plotting of the data.
 
 ## Features
 

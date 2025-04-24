@@ -49,7 +49,7 @@ This Python code provides a framework for managing and simulating the performanc
 
 ## Usage
 
-- **Run the application:"**
+- **Run the application:**
     ```bash
     python controller.py
     ``` 

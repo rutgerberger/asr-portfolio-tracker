@@ -192,11 +192,12 @@ class Controller():
         However, due to time limitations only 10 performed (edit this manually)
         """
         num_simulations = 10
-        paths = self.Model.SimulatePortfolio(num_simulations, 10, 60)
-        plot = View("Portfolio simulation using Random Forest Regressor (15y)", "Time", "Estimated value", legend=False)
+        paths = self.Model.SimulatePortfolio(num_simulations, 15, 60)
+        plot = View("Portfolio simulation using Random Forest Regressor (15y)", "Years ahead", "Estimated value", legend=False)
         for idx,path in enumerate(paths):
             my_list = [float(i) for i in path[1:]]
-            plot.PlotData(range(len(path[1:])), my_list, f'Scenario {idx}')
+            ind = [i/251 for i in range(len(path[1:]))]
+            plot.PlotData(ind, my_list, f'Scenario {idx}')
         plot.Show()
 
 

@@ -235,13 +235,13 @@ class Model():
 
         for asset in assets:
             model = RandomForestRegressor() # Input data is quite limited, random forest often sufficient
-            data = self.GetHistoricalData(asset.name , '30y')
+            data = self.GetHistoricalData(asset.name , '10y')
             print("Retrieved historical data...")
             data = self.GetAssetFeatures(data)
             print("Calculated features for historical data...")
             data = self.TransformData(data, look_back)
             X, y = self.SplitData(data)
-            print("Preprocessed data... now training...")
+            print("Preprocessed data... now training (this can take some time!)")
             
             if X is not None:
                 X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2)
@@ -297,7 +297,7 @@ class Model():
                         X = X.iloc[[-1]] #get the last row
                         X, _ = self.SplitData(X)
                         predicted_change = models[asset.name].predict(X) # Predicted closing price for the next day by the model
-                        randomness = np.random.normal(0, min(abs(asset_sequences[asset.name]['DailyChange'].iloc[-1]*2), 6)) # Add random element (rf is deterministic otherwise)
+                        randomness = np.random.normal(0, min(abs(asset_sequences[asset.name]['DailyChange'].iloc[-1]*2), 11)) # Add random element (rf is deterministic otherwise)
 
                         predicted_change += randomness
                         new_price = asset_sequences[asset.name]['Close'].iloc[-1] + predicted_change #Predicted price for the next day

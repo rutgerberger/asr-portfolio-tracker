@@ -223,13 +223,12 @@ class Model():
 
     def TrainModels(self, look_back=60):
         """
-        Seperate function to train random forest models
-        Used within the simulation.
+        Seperate function to train random forest
+        models. Used within the simulation.
         Trains a seperate model for each
         asset within the portfolio
         """
         assets = self.assets
-        # Train a simple RF model for each asset
         print("Training models.")
         models = {}
 
@@ -302,7 +301,6 @@ class Model():
                         predicted_change += randomness
                         new_price = asset_sequences[asset.name]['Close'].iloc[-1] + predicted_change #Predicted price for the next day
 
-
                         if new_price <= 0:
                             new_price = 0.000001 #Non-zero prices.
                         values.append(asset.quantity * new_price)
@@ -310,8 +308,6 @@ class Model():
                         new_row = pd.DataFrame({"Open": asset_sequences[asset.name]['Close'].iloc[[-1]], "Close": new_price}) # Wrong assumptionn
                         calc_sequences[asset.name] = pd.concat([calc_sequences[asset.name], new_row], ignore_index=True).iloc[-(look_back*2):]
                         asset_sequences[asset.name] = self.GetAssetFeatures(calc_sequences[asset.name])
-                        #sequence.columns = col_names
-                        #asset_sequences[asset.name] = sequence
 
                 current_portfolio_value = sum(values)
                 portfolio_values.append(current_portfolio_value)

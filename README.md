@@ -37,7 +37,7 @@ This Python code provides a framework for managing and simulating the performanc
 -   scikit-learn
 -   matplotlib
 
--   See requirements.txt
+  Or see requirements.txt
 
 ## Installation
 

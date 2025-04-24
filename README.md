@@ -50,4 +50,6 @@ This Python code provides a framework for managing and simulating the performanc
 ## Usage
 
 - **Run the application:"**
-    - Run: python controller.py
+    ```bash
+    python controller.py
+    ``` 

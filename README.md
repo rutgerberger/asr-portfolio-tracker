@@ -63,5 +63,4 @@ This Python code provides a framework for managing and simulating the performanc
     This may decrease the model's accuracy, but significantly speed up the training process
 2.  If you wish to speed up the simulation process, the only thing you can do is to limit
    - The number of simulations
-   - The prediction window
-     This comes with a price of giving less insight, of course
+   - The prediction window. Both come with a price, of course

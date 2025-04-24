@@ -235,15 +235,22 @@ class Model():
 
         for asset in assets:
             model = RandomForestRegressor() # Input data is quite limited, random forest often sufficient
-            data = self.GetHistoricalData(asset.name , '50y')
+            data = self.GetHistoricalData(asset.name , '30y')
+            print("Retrieved historical data...")
             data = self.GetAssetFeatures(data)
+            print("Calculated features for historical data...")
             data = self.TransformData(data, look_back)
             X, y = self.SplitData(data)
+            print("Preprocessed data... now training...")
             
             if X is not None:
-                X_train, _, y_train, _ = train_test_split(X, y, test_size=0.2)
+                X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2)
                 model.fit(X_train, y_train)
                 models[asset.name] = model
+                #We could test accuracy by predicting test set:
+                #y_pred = model.predict(X_test)
+                #error = sklearn....MeanSquaredError(y_test, y_pred)
+                #error = sklearn....MeanAbsoluteError(y_test, y_pred)
 
             else:
                 print(f"Could not prepare data for {asset.name}")

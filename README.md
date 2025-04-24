@@ -1,5 +1,4 @@
-# Portfolio Management with Machine Learning
-
+# Portfolio Management with ML
 ## Overview
 
 This Python code provides a framework for managing and simulating the performance of a financial portfolio. It uses the `yfinance` library to fetch historical stock data and scikit-learn's `RandomForestRegressor` for predicting future asset prices. The core components include:

@@ -60,7 +60,8 @@ This Python code provides a framework for managing and simulating the performanc
     ```python
     data = self.GetHistoricalData(asset.name , '50y') # Change to, for example, 5y.
     ```
-    This may decrease the model's accuracy, but significantly speed up the training process
-2.  If you wish to speed up the simulation process, the only thing you can do is to limit
+    This may decrease the model's accuracy, but significantly speed up the training process.
+    Moreover - a model is trained per asset. Less assets means faster training.
+3.  If you wish to speed up the simulation process, the only thing you can do is to limit
    - The number of simulations
    - The prediction window. Both come with a price, of course
